@@ -44,7 +44,7 @@ jobs:
       with:
         version: "${{ env.QT_VERSION }}"
         arch: "${{ matrix.qt_arch }}"
-        modules: "qtwebengine qtwebchannel qtpositioning"
+        modules: "qtwebengine qtwebchannel qtpositioning qtserialport"
         cache: true
     - name: Install Inno Setup
       run: |
@@ -101,8 +101,9 @@ jobs:
         cd build
         set PATH=%PATH%;C:\Program Files (x86)\Inno Setup 6;%CD%
         set "QT_ROOT_DIR=%QT_ROOT_DIR:\=/%"
+        set "PACKAGE_BUILD_DIR=%CD:\=/%"
         lib /def:mpv\mpv.def /out:mpv\libmpv-2.dll.lib /MACHINE:${{ matrix.machine }} || exit /b 1
-        cmake -GNinja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=output -DQTROOT="%QT_ROOT_DIR%" -DMPV_INCLUDE_DIR="%CD%/mpv/include" -DMPV_LIBRARY="%CD%/mpv/libmpv-2.dll.lib" -DCHECK_FOR_UPDATES=OFF -DUSE_STATIC_MPVQT=ON .. || exit /b 1
+        cmake -GNinja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_INSTALL_PREFIX=output -DQTROOT="%QT_ROOT_DIR%" -DMPV_INCLUDE_DIR:PATH="%PACKAGE_BUILD_DIR%/mpv/include" -DMPV_LIBRARY:FILEPATH="%PACKAGE_BUILD_DIR%/mpv/libmpv-2.dll.lib" -DCHECK_FOR_UPDATES=OFF -DUSE_STATIC_MPVQT=ON .. || exit /b 1
         ninja || exit /b 1
         set "PATH=%QT_ROOT_DIR%/bin;%CD%/mpv;%PATH%"
         set "QT_QPA_PLATFORM=offscreen"
