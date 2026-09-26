@@ -70,8 +70,11 @@ static int fakeVlc(QCoreApplication& app)
         if (command == "pl_forceresume") state["state"] = "playing";
         if (command == "seek") state["time"] = query.queryItemValue("val").toDouble();
         const auto body = QJsonDocument(state).toJson(QJsonDocument::Compact);
-        socket->write("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\nContent-Length: " + QByteArray::number(body.size()) + "\r\n\r\n" + body);
-        socket->disconnectFromHost();
+        const auto response = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\nContent-Length: " + QByteArray::number(body.size()) + "\r\n\r\n" + body;
+        QTimer::singleShot(state.value("responseDelayMilliseconds").toInt(), socket, [socket, response] {
+          socket->write(response);
+          socket->disconnectFromHost();
+        });
       });
     }
   });
@@ -143,6 +146,9 @@ private slots:
     QVERIFY(start(c)); c.stop("session-one"); QTRY_COMPARE(ended.size(), 1);
   }
   void reportsAuthenticatedProgressAndControls() {
+    // Receiving/logging a command in the player is earlier than the controller
+    // receiving its response. Keep that gap explicit to exercise async waits.
+    state(12, "playing", {{"responseDelayMilliseconds", 100}});
     ExternalPlayerController c; QSignalSpy updated(&c, &ExternalPlayerController::updated); QSignalSpy ended(&c, &ExternalPlayerController::ended);
     QVERIFY(start(c)); QTRY_VERIFY_WITH_TIMEOUT(!updated.isEmpty(), 5000);
     QCOMPARE(updated.last().at(1).toLongLong(), 12000); QCOMPARE(updated.last().at(2).toLongLong(), 100000);
@@ -150,7 +156,7 @@ private slots:
     c.pause("session-one"); QTRY_COMPARE(updated.last().at(3).toString(), QString("paused"));
     c.play("session-one"); QTRY_COMPARE(updated.last().at(3).toString(), QString("playing"));
     c.seekTo("session-one", 42500); QTRY_VERIFY(log().contains("command=seek&val=42"));
-    QCOMPARE(updated.last().at(1).toLongLong(), 42000);
+    QTRY_COMPARE(updated.last().at(1).toLongLong(), 42000);
     c.setVolume("session-one", 40); QTRY_VERIFY(log().contains("command=volume&val=102"));
     c.setMuted("session-one", true); QTRY_VERIFY(log().contains("command=volume&val=0"));
     c.stop("session-one"); QTRY_COMPARE(ended.size(), 1);
