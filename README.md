@@ -24,6 +24,12 @@ Built from the latest commit on `master`.
 ## Building
 See [dev/](dev/) for platform-specific build instructions.
 
+## External players
+
+This branch adds optional installed VLC (Windows/macOS) and PotPlayer (Windows)
+integration with playback progress reporting. See [setup and verification
+boundaries](docs/external-players.md). Embedded MPV remains the default.
+
 ## File Locations
 Data is stored per-profile in a `profiles/<profile-id>/` subdirectory. The main configuration file is `jellyfin-desktop.conf`. You can also add `mpv.conf` to configure MPV directly.
 

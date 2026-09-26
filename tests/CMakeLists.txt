@@ -39,3 +39,23 @@ target_link_libraries(test_displaymanager jmp_core Qt6::Test)
 target_include_directories(test_displaymanager PRIVATE ${TEST_INCLUDE_DIRS})
 target_compile_definitions(test_displaymanager PRIVATE ${TEST_COMPILE_DEFS})
 add_test(NAME test_displaymanager COMMAND test_displaymanager)
+
+# The external controller only needs Qt Core/Network, so it also has a standalone
+# test build in tests/external-player for machines without WebEngine or libmpv.
+add_executable(test_externalplayercontroller
+  test_externalplayercontroller.cpp
+  ../src/player/ExternalPlayerController.cpp
+  ../src/player/ExternalPlayerController.h
+)
+target_link_libraries(test_externalplayercontroller Qt6::Core Qt6::Network Qt6::Test)
+target_include_directories(test_externalplayercontroller PRIVATE ${CMAKE_SOURCE_DIR}/src/player)
+if(WIN32)
+  target_link_libraries(test_externalplayercontroller user32)
+endif()
+add_test(NAME test_externalplayercontroller COMMAND test_externalplayercontroller)
+
+find_program(NODE_EXECUTABLE NAMES node nodejs)
+if(NODE_EXECUTABLE)
+  add_test(NAME test_externalvideoplayer
+    COMMAND ${NODE_EXECUTABLE} --test ${CMAKE_CURRENT_SOURCE_DIR}/test_externalvideoplayer.js)
+endif()

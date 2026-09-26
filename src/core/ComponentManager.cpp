@@ -8,6 +8,7 @@
 #include "power/PowerComponent.h"
 #include "input/InputComponent.h"
 #include "player/PlayerComponent.h"
+#include "player/ExternalPlayerComponent.h"
 #include "display/DisplayComponent.h"
 #include "system/SystemComponent.h"
 #include "settings/SettingsComponent.h"
@@ -60,6 +61,7 @@ void ComponentManager::initialize()
   registerComponent(&SystemComponent::Get());
   registerComponent(&DisplayComponent::Get());
   registerComponent(&PlayerComponent::Get());
+  registerComponent(&ExternalPlayerComponent::Get());
   registerComponent(&PowerComponent::Get());
   registerComponent(&TaskbarComponent::Get());
   registerComponent(&WindowManager::Get());

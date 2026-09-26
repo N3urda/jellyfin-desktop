@@ -170,6 +170,32 @@
         "platforms": [ "windows" ]
       },
       {
+        "value": "externalVideoPlayer",
+        "display_name": "External Video Player",
+        "help": "Play videos in an installed external player and sync progress to Jellyfin. Keep Jellyfin Desktop open during playback. Restart the application after changing this selection. Audio playback still follows Enable MPV Player.",
+        "default": "disabled",
+        "possible_values": [
+          [ "disabled", "Built-in player" ],
+          [ "vlc", "VLC" ],
+          [ "potplayer", "PotPlayer (Windows)", { "platforms": [ "windows" ] } ]
+        ]
+      },
+      {
+        "value": "vlcPath",
+        "display_name": "VLC Executable Path",
+        "help": "Leave empty to detect VLC. For a portable installation, enter the full path to vlc.exe. On macOS, VLC.app or its Contents/MacOS/VLC executable is accepted. Do not include command-line arguments.",
+        "input_type": "text",
+        "default": ""
+      },
+      {
+        "value": "potPlayerPath",
+        "display_name": "PotPlayer Executable Path",
+        "help": "Leave empty to detect PotPlayer, or enter the full path to PotPlayerMini64.exe or PotPlayerMini.exe. Do not include command-line arguments.",
+        "input_type": "text",
+        "platforms": [ "windows" ],
+        "default": ""
+      },
+      {
         "value": "enableMPV",
         "display_name": "Enable MPV Player",
         "help": "Enables MPV player for video and audio playback. When disabled, Jellyfin will fall back to the browser's built-in HTML5 player. This setting requires an application restart to take effect.\n\nNote: Disabling MPV will lose advanced features like audio passthrough, hardware decoding options, and codec-specific settings.",
