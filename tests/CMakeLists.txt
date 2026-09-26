@@ -52,7 +52,14 @@ target_include_directories(test_externalplayercontroller PRIVATE ${CMAKE_SOURCE_
 if(WIN32)
   target_link_libraries(test_externalplayercontroller user32)
 endif()
-add_test(NAME test_externalplayercontroller COMMAND test_externalplayercontroller)
+if(WIN32)
+  # Qt Test may send default output to a debugger for Windows executables.
+  # Keep an explicit file so CI can always show the failing assertion.
+  add_test(NAME test_externalplayercontroller COMMAND test_externalplayercontroller
+    -o ${CMAKE_CURRENT_BINARY_DIR}/external-controller-results.txt,txt)
+else()
+  add_test(NAME test_externalplayercontroller COMMAND test_externalplayercontroller)
+endif()
 
 find_program(NODE_EXECUTABLE NAMES node nodejs)
 if(NODE_EXECUTABLE)

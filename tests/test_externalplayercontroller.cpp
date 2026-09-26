@@ -15,6 +15,16 @@
 #include <QTimer>
 #include <QUrlQuery>
 
+static QByteArray headerValue(const QByteArray& request, const QByteArray& name)
+{
+  for (const auto& line : request.split('\n')) {
+    const int separator = line.indexOf(':');
+    if (separator >= 0 && line.left(separator).trimmed().compare(name, Qt::CaseInsensitive) == 0)
+      return line.mid(separator + 1).trimmed();
+  }
+  return {};
+}
+
 // A separate process speaks VLC's real loopback HTTP protocol. It lets the tests
 // cover QProcess ownership, authentication, controls and asynchronous teardown.
 static int fakeVlc(QCoreApplication& app)
@@ -41,9 +51,14 @@ static int fakeVlc(QCoreApplication& app)
         if (!request.contains("\r\n\r\n")) return;
         socket->disconnect(socket, &QTcpSocket::readyRead, nullptr, nullptr);
         const auto target = request.split(' ').value(1);
-        const bool authenticated = request.contains("Authorization: Basic " + (":" + password.toUtf8()).toBase64());
+        const bool authenticated = headerValue(request, "Authorization") == "Basic " + (":" + password.toUtf8()).toBase64();
         log.write(QJsonDocument(QJsonObject{{"target", QString::fromUtf8(target)}, {"authenticated", authenticated}}).toJson(QJsonDocument::Compact) + '\n');
         log.flush();
+        if (!authenticated) {
+          socket->write("HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+          socket->disconnectFromHost();
+          return;
+        }
         QFile stateFile(qEnvironmentVariable("EXTERNAL_PLAYER_TEST_STATE"));
         if (!stateFile.open(QIODevice::ReadOnly)) { app.exit(4); return; }
         auto state = QJsonDocument::fromJson(stateFile.readAll()).object();
@@ -82,6 +97,12 @@ private:
     return c.start("vlc", QCoreApplication::applicationFilePath(), "https://example.test/movie?api_key=secret", options(id));
   }
 private slots:
+  void httpHeaderNamesAreCaseInsensitive() {
+    for (const auto& name : {QByteArray("Authorization"), QByteArray("authorization"), QByteArray("AUTHORIZATION")}) {
+      QCOMPARE(headerValue("GET / HTTP/1.1\r\n" + name + ": Basic OnRlc3Q=\r\n\r\n", "Authorization"), QByteArray("Basic OnRlc3Q="));
+    }
+    QVERIFY(headerValue("GET /?Authorization=secret HTTP/1.1\r\nHost: localhost\r\n\r\n", "Authorization").isEmpty());
+  }
   void init() {
     QVERIFY(dir.isValid());
     QFile::remove(dir.filePath("log.jsonl"));

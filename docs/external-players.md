@@ -80,7 +80,7 @@ Validated on macOS 26.6.2 arm64 with Qt 6.11.2 and VLC 3.0.24:
 - The actual VLC smoke test passes against a generated 20-second local video: app-bundle launch, resume near three seconds, observed pause/resume, seek near eight seconds, final position on stop, and a second launch through natural completion. Volume/mute commands are sent without errors; the smoke test does not measure the resulting audio output.
 - The development application launches and renders the Jellyfin web client with VLC selected in an isolated test configuration. Authenticated media playback and server-side saved progress have **not** been validated.
 
-Windows VLC/PotPlayer have **not** been built or run on a Windows machine. Signed distributable packages, older macOS versions, sandboxed distribution, and remote streams/subtitles still need the checks below. The local Homebrew-linked development build is not a portable release artifact.
+Windows VLC/PotPlayer integration has **not** been tested with real players on a Windows machine. Release build and installer checks are recorded separately in each release. Older macOS versions, sandboxed distribution, and remote streams/subtitles still need the checks below. The local Homebrew-linked development build is not a portable release artifact.
 
 Repeat the tests from the repository root:
 

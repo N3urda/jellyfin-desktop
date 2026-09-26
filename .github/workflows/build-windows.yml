@@ -106,7 +106,10 @@ jobs:
         ninja || exit /b 1
         set "PATH=%QT_ROOT_DIR%/bin;%CD%/mpv;%PATH%"
         set "QT_QPA_PLATFORM=offscreen"
-        ctest --output-on-failure || exit /b 1
+        ctest --output-on-failure
+        set "TEST_RESULT=%ERRORLEVEL%"
+        if exist tests\external-controller-results.txt type tests\external-controller-results.txt
+        if not "%TEST_RESULT%"=="0" exit /b %TEST_RESULT%
         node --test ../tests/test_externalvideoplayer.js || exit /b 1
         ninja windows_package || exit /b 1
       shell: cmd
