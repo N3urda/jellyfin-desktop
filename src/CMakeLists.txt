@@ -129,7 +129,7 @@ add_executable(${MAIN_TARGET} WIN32 MACOSX_BUNDLE ${MAIN_SRCS} ${BUNDLED_FILES} 
 add_dependencies(${MAIN_TARGET} generate_resources)
 std_target_properties(${MAIN_TARGET})
 if(APPLE)
-  set(_install_rpath "@executable_path/../Frameworks;${QTROOT}/lib")
+  set(_install_rpath "@executable_path/../Frameworks")
 else()
   set(_install_rpath "${QTROOT}/lib")
 endif()

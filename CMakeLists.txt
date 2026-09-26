@@ -5,6 +5,10 @@ if (EXISTS "${CMAKE_SOURCE_DIR}/toolchain.cmake")
   set(CMAKE_TOOLCHAIN_FILE "${CMAKE_SOURCE_DIR}/toolchain.cmake")
 endif()
 
+if(CMAKE_HOST_APPLE AND NOT DEFINED CMAKE_OSX_DEPLOYMENT_TARGET)
+  set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "Minimum supported macOS version")
+endif()
+
 project(JellyfinDesktop CXX C)
 
 # we want this to be able to run clang-tidy

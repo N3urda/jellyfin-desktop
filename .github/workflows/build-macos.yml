@@ -2,7 +2,16 @@ name: build-macos
 
 on:
   workflow_call:
+    inputs:
+      include_intel:
+        type: boolean
+        default: true
   workflow_dispatch:
+    inputs:
+      include_intel:
+        description: Also build an Intel Mac package
+        type: boolean
+        default: true
   push:
     branches:
       - master
@@ -12,18 +21,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - runner: macos-15
-            artifact: macos-arm64
-          - runner: macos-15-intel
-            artifact: macos-x86_64
+        include: ${{ fromJSON(inputs.include_intel == false && '[{"runner":"macos-15","artifact":"macos-arm64"}]' || '[{"runner":"macos-15","artifact":"macos-arm64"},{"runner":"macos-15-intel","artifact":"macos-x86_64"}]') }}
     runs-on: ${{ matrix.runner }}
     steps:
     - uses: actions/checkout@v7
       with:
         submodules: recursive
     - name: Install Qt
-      uses: jurplel/install-qt-action@v4
+      uses: jurplel/install-qt-action@v4.4.1
       with:
         # using older version due to severe memory leak
         # https://qt-project.atlassian.net/browse/QTBUG-141377https://qt-project.atlassian.net/browse/QTBUG-141377
@@ -31,23 +36,32 @@ jobs:
         version: '6.9.3'
         arch: clang_64
         modules: 'qtwebengine qtwebchannel qtpositioning'
+        cache: true
     - name: Install dependencies
       run: |
-        brew update
         brew install mpv
     - name: Release build
       run: |
         cmake -B build -G Ninja \
-          -DQTROOT=$QT_ROOT_DIR \
-          -DCMAKE_PREFIX_PATH=$QT_ROOT_DIR \
+          -DQTROOT="$QT_ROOT_DIR" \
+          -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR" \
           -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
           -DCMAKE_INSTALL_PREFIX=build/output \
-          -DCHECK_FOR_UPDATES=ON \
+          -DCHECK_FOR_UPDATES=OFF \
           -DUSE_STATIC_MPVQT=ON
-        cmake --build build --target install
+        cmake --build build --parallel 3
+        QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure
+        node --test tests/test_externalvideoplayer.js
+        cmake --install build
+    - name: Verify bundled dependencies
+      run: python3 scripts/verify_macos_bundle.py "build/output/Jellyfin Desktop.app" --arch "$(uname -m)" --max-macos 15.0
     - name: Sign and create dmg
       run: |
         codesign --force --deep -s - "./build/output/Jellyfin Desktop.app/"
+        codesign --verify --deep --strict --verbose=2 "./build/output/Jellyfin Desktop.app/"
+        env -u QT_PLUGIN_PATH -u QML_IMPORT_PATH -u QML2_IMPORT_PATH -u DYLD_LIBRARY_PATH -u DYLD_FRAMEWORK_PATH \
+          "./build/output/Jellyfin Desktop.app/Contents/MacOS/Jellyfin Desktop" --help
         brew install create-dmg
         VERSION=$(cat VERSION)
         ARCH=$(uname -m)
@@ -65,3 +79,4 @@ jobs:
       with:
         name: ${{ matrix.artifact }}
         path: ${{ github.workspace }}/JellyfinDesktop-*.dmg
+        if-no-files-found: error

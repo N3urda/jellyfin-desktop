@@ -24,11 +24,26 @@ endforeach(BIN ${BINS})
 set(ENV{DYLD_LIBRARY_PATH} @QTROOT@/lib:${brew_qt_lib}:${brew_lib}:@DEPENDENCY_ROOT@/lib)
 set(ENV{DYLD_FRAMEWORK_PATH} @QTROOT@/lib:${brew_qt_lib}:${brew_lib}:@DEPENDENCY_ROOT@/lib)
 
+file(REMOVE "${app}/Contents/Resources/qt.conf")
 execute_process(
-  COMMAND ${CMAKE_COMMAND} -E remove "${app}/Contents/Resources/qt.conf"
   COMMAND "@QTROOT@/bin/macdeployqt" ${args}
   WORKING_DIRECTORY "@QTROOT@/bin"
+  RESULT_VARIABLE deploy_result
 )
+if(NOT deploy_result STREQUAL "0")
+  message(FATAL_ERROR "macdeployqt failed with exit code ${deploy_result}")
+endif()
+
+function(update_install_name)
+  execute_process(
+    COMMAND install_name_tool ${ARGN}
+    RESULT_VARIABLE fix_result
+    ERROR_VARIABLE fix_error
+  )
+  if(NOT fix_result STREQUAL "0")
+    message(FATAL_ERROR "install_name_tool failed: ${fix_error}")
+  endif()
+endfunction()
 
 #
 # fix_install_names: Fix library paths for bundled dylibs/sos
@@ -60,7 +75,7 @@ function(fix_lib_dependencies lib framework_libs_var)
       string(REGEX REPLACE " \\(compatibility.*$" "" old_ref "${line}")
       set(new_ref "@executable_path/../Frameworks/${qt_name}.framework/Versions/A/${qt_name}")
       message(STATUS "Fixing flat Qt ref ${old_ref} -> ${new_ref}")
-      execute_process(COMMAND install_name_tool -change "${old_ref}" "${new_ref}" "${lib}" ERROR_QUIET)
+      update_install_name(-change "${old_ref}" "${new_ref}" "${lib}")
       continue()
     endif()
 
@@ -123,7 +138,7 @@ function(fix_lib_dependencies lib framework_libs_var)
           string(REGEX MATCH "[^/]+\\.framework/.*" fw_rel_path "${dependency_str}")
           set(target "@executable_path/../Frameworks/${fw_rel_path}")
           message(STATUS "Fixing Qt framework ${dependency_str} -> ${target}")
-          execute_process(COMMAND install_name_tool -change "${dependency_str}" "${target}" "${lib}" ERROR_QUIET)
+          update_install_name(-change "${dependency_str}" "${target}" "${lib}")
           continue()
         endif()
 
@@ -144,8 +159,9 @@ function(fix_lib_dependencies lib framework_libs_var)
             if(NOT "${real_name}" STREQUAL "${bin_name}")
               file(RENAME "${framework_path}/${real_name}" "${framework_path}/${bin_name}")
             endif()
-            execute_process(COMMAND install_name_tool -id "${target}" "${framework_path}/${bin_name}" ERROR_QUIET)
+            update_install_name(-id "${target}" "${framework_path}/${bin_name}")
             list(APPEND framework_libs "${bin_name}")
+            set(${framework_libs_var} "${framework_libs}" PARENT_SCOPE)
             set_property(GLOBAL APPEND PROPERTY LIBS_TO_FIX "${framework_path}/${bin_name}")
           else()
             message(WARNING "Could not find framework binary: ${resolved_fw}")
@@ -154,7 +170,7 @@ function(fix_lib_dependencies lib framework_libs_var)
         endif()
 
         message(STATUS "Fixing ${dependency_str} -> ${target}")
-        execute_process(COMMAND install_name_tool -change "${dependency_str}" "${target}" "${lib}" ERROR_QUIET)
+        update_install_name(-change "${dependency_str}" "${target}" "${lib}")
         continue()
       endif()
 
@@ -174,7 +190,7 @@ function(fix_lib_dependencies lib framework_libs_var)
           file(RENAME "${framework_path}/${real_name}" "${framework_path}/${dep_name}")
         endif()
         # Set the ID of the newly copied library to its new location
-        execute_process(COMMAND install_name_tool -id "${target}" "${framework_path}/${dep_name}" ERROR_QUIET)
+        update_install_name(-id "${target}" "${framework_path}/${dep_name}")
         list(APPEND framework_libs "${dep_name}")
         set(${framework_libs_var} "${framework_libs}" PARENT_SCOPE)
         # Queue newly added lib for processing
@@ -183,7 +199,7 @@ function(fix_lib_dependencies lib framework_libs_var)
 
       # Fix the reference in the current library
       message(STATUS "Fixing ${dependency_str} -> ${target} in ${lib}")
-      execute_process(COMMAND install_name_tool -change "${dependency_str}" "${target}" "${lib}" ERROR_QUIET)
+      update_install_name(-change "${dependency_str}" "${target}" "${lib}")
     endif()
   endforeach()
 endfunction()
@@ -204,9 +220,12 @@ file(GLOB_RECURSE all_sos "${app}/*.so")
 file(GLOB framework_bins "${framework_path}/*.framework/Versions/*/[A-Z]*")
 list(FILTER framework_bins EXCLUDE REGEX "\\.(plist|h|json|tbd)$")
 list(FILTER framework_bins EXCLUDE REGEX "/(Headers|Resources)/")
-set_property(GLOBAL PROPERTY LIBS_TO_FIX ${all_dylibs} ${all_sos} ${framework_bins})
+set_property(GLOBAL PROPERTY LIBS_TO_FIX ${all_dylibs} ${all_sos} ${framework_bins}
+  "${app}/Contents/MacOS/@MAIN_NAME@"
+  "${weprocess}/Contents/MacOS/QtWebEngineProcess")
 
 # Process libs iteratively (handles newly discovered deps)
+macro(fix_queued_libraries)
 set(max_iterations 100)
 set(iteration 0)
 while(iteration LESS max_iterations)
@@ -227,6 +246,12 @@ while(iteration LESS max_iterations)
 
   math(EXPR iteration "${iteration} + 1")
 endwhile()
+get_property(remaining_libs GLOBAL PROPERTY LIBS_TO_FIX)
+if(remaining_libs)
+  message(FATAL_ERROR "Library dependency fixup exceeded ${max_iterations} iterations")
+endif()
+endmacro()
+fix_queued_libraries()
 
 message(STATUS "Library path fixing complete")
 
@@ -261,13 +286,18 @@ if(EXISTS "${sdl2_compat_lib}")
         if(NOT "${sdl3_source_name}" STREQUAL "libSDL3.dylib")
           file(RENAME "${framework_path}/${sdl3_source_name}" "${sdl3_target}")
         endif()
-        execute_process(COMMAND install_name_tool -id "@executable_path/../Frameworks/libSDL3.dylib" "${sdl3_target}" ERROR_QUIET)
+        update_install_name(-id "@executable_path/../Frameworks/libSDL3.dylib" "${sdl3_target}")
+        list(APPEND framework_libs "libSDL3.dylib")
+        set_property(GLOBAL APPEND PROPERTY LIBS_TO_FIX "${sdl3_target}")
       else()
         message(WARNING "sdl2-compat detected but libSDL3 was not found in ${brew_lib}; the app will fail at runtime with 'Failed loading SDL3 library.'")
       endif()
     endif()
   endif()
 endif()
+
+# SDL3 is loaded via dlopen, but its own dependencies still need bundling.
+fix_queued_libraries()
 
 # List all bundled libraries for verification
 file(GLOB final_dylibs "${framework_path}/*.dylib")
@@ -313,8 +343,7 @@ if(EXISTS "${webengine_bin}")
       set(target "@executable_path/../Frameworks${framework_suffix}")
 
       message(STATUS "Fixing WebEngine: ${dependency_str} -> ${target}")
-      execute_process(COMMAND install_name_tool -id "${target}" "${webengine_bin}" ERROR_QUIET)
-      execute_process(COMMAND install_name_tool -change "${dependency_str}" "${target}" "${webengine_bin}" ERROR_QUIET)
+      update_install_name(-change "${dependency_str}" "${target}" "${webengine_bin}")
     endif()
   endforeach()
 endif()

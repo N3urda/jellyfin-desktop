@@ -1,0 +1,18 @@
+name: External player test packages
+
+on:
+  push:
+    branches:
+      - codex/external-player-sync
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  macos:
+    uses: ./.github/workflows/build-macos.yml
+    with:
+      include_intel: false
+  windows:
+    uses: ./.github/workflows/build-windows.yml
