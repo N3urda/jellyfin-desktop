@@ -34,6 +34,15 @@ if(NOT deploy_result STREQUAL "0")
   message(FATAL_ERROR "macdeployqt failed with exit code ${deploy_result}")
 endif()
 
+# Qt deploys optional SQL drivers whose vendor clients are not in the SDK.
+# Jellyfin Desktop does not use these database backends. Keep SQLite, and omit
+# drivers that would otherwise retain missing Mimer/ODBC/Postgres dependencies.
+file(REMOVE
+  "${app}/Contents/PlugIns/sqldrivers/libqsqlmimer.dylib"
+  "${app}/Contents/PlugIns/sqldrivers/libqsqlodbc.dylib"
+  "${app}/Contents/PlugIns/sqldrivers/libqsqlpsql.dylib"
+)
+
 function(update_install_name)
   execute_process(
     COMMAND install_name_tool ${ARGN}
